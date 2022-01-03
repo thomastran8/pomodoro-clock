@@ -11,13 +11,17 @@ Pomodoro::Pomodoro(QWidget *parent)
     , m_isBreakRunning { false }
     , m_curMinSecTime { 0, 0 }
     , m_curMinSecBreak { 0, 0 }
-    , m_timeStatus { false, false }
-    , m_breakStatus { false, false }
+    , m_timeStatus { false, false, false }
+    , m_breakStatus { false, false, false }
 {
     ui->setupUi(this);
 
     // set title
     this->setWindowTitle("Pomodoro Clock");
+
+    // set initial values
+    setLineEdit("0", ui->setTimeLineEdit, ui->timeCounter);
+    setLineEdit("0", ui->setBreakLineEdit, ui->breakCounter);
 
     qInfo() << "constructor";
 }
@@ -29,31 +33,32 @@ Pomodoro::~Pomodoro()
     qInfo() << "destructor";
 }
 
-void Pomodoro::on_setTimeLineEdit_textEdited(const QString &minuteStr)
+void Pomodoro::on_setTimeLineEdit_editingFinished()
+{
+    setLineEdit(ui->setTimeLineEdit->text(), ui->setTimeLineEdit, ui->timeCounter);
+}
+
+void Pomodoro::on_setBreakLineEdit_editingFinished()
+{
+    setLineEdit(ui->setBreakLineEdit->text(), ui->setBreakLineEdit, ui->breakCounter);
+}
+
+void Pomodoro::setLineEdit(const QString &minuteStr, QLineEdit* lineEdit, QLabel* labelCounter)
 {
     // Validate minute
-    validateMinute(minuteStr, ui->setTimeLineEdit);
+    if (minuteStr != "-1")
+    {
+        validateMinute(minuteStr, lineEdit);
+    }
 
     // Format minute and second
-    QString timeFormat = formatMinSec(ui->setTimeLineEdit);
+    QString timeFormat = formatMinSec(lineEdit);
 
     // Set formatted time
-    ui->timeCounter->setText(timeFormat);
+    labelCounter->setText(timeFormat);
 }
 
-void Pomodoro::on_setBreakLineEdit_textEdited(const QString &minuteStr)
-{
-    // Validate minute
-    validateMinute(minuteStr, ui->setBreakLineEdit);
-
-    // Format hour and minute
-    QString breakFormat = formatMinSec(ui->setBreakLineEdit);
-
-    // Set formatted time
-    ui->breakCounter->setText(breakFormat);
-}
-
-void Pomodoro::validateMinute(QString minuteStr, QLineEdit* lineEdit)
+void Pomodoro::validateMinute(const QString minuteStr, QLineEdit* lineEdit)
 {
     // Convert to int
     bool ok { false };
@@ -110,9 +115,14 @@ void Pomodoro::on_startBreakBtn_clicked()
 }
 
 void Pomodoro::toggleTimer(TimerStatus &timerStatus, TimeInfo &timeInfo, QLineEdit* lineEdit, QTimer*& timer, QPushButton* pushButton, QLabel* counterLabel)
-{
-    // Start timer
-    if (!timerStatus.isRunning)
+{    
+    // If timer is done, do nothing
+    if (timerStatus.isDone)
+    {
+        return;
+    }
+    // Start new timer
+    else if (!timerStatus.isRunning && !timerStatus.isPaused)
     {
         // Get initial hour and minute values
         timeInfo.minute = lineEdit->text().toInt();
@@ -144,9 +154,8 @@ void Pomodoro::toggleTimer(TimerStatus &timerStatus, TimeInfo &timeInfo, QLineEd
         timerStatus.isPaused = true;
 
         // change button label
-        pushButton->setText("Start");
+        pushButton->setText("Resume");
     }
-    // Timer has finished already, start again
     else
     {
         timer->start();
@@ -154,6 +163,22 @@ void Pomodoro::toggleTimer(TimerStatus &timerStatus, TimeInfo &timeInfo, QLineEd
 
         // change button label
         pushButton->setText("Pause");
+    }
+
+    // Stop other time / break timer
+    if (pushButton == ui->startTimeBtn && m_breakStatus.isRunning && !m_breakStatus.isPaused)
+    {
+        m_breakCounterTimer->stop();
+        m_breakStatus.isPaused = true;
+
+        ui->startBreakBtn->setText("Resume");
+    }
+    else if (pushButton == ui->startBreakBtn && m_timeStatus.isRunning && !m_timeStatus.isPaused)
+    {
+        m_timeCounterTimer->stop();
+        m_timeStatus.isPaused = true;
+
+        ui->startTimeBtn->setText("Resume");
     }
 }
 
@@ -190,10 +215,12 @@ void Pomodoro::updateClockTime()
         disconnect(m_timeCounterTimer, SIGNAL(timeout()), this, SLOT(updateClockTime()));
 
         // change button label
-        ui->startTimeBtn->setText("Start");
+        ui->startTimeBtn->setText("---");
 
         // Unset flag
         m_timeStatus.isRunning = false;
+        m_timeStatus.isPaused = false;
+        m_timeStatus.isDone = true;
     }
 }
 
@@ -226,13 +253,49 @@ void Pomodoro::updateClockBreak()
     // Disconnect timer slot
     else
     {
-        ui->timeCounter->setText("Done!");
+        ui->breakCounter->setText("Done!");
         disconnect(m_breakCounterTimer, SIGNAL(timeout()), this, SLOT(updateClockBreak()));
 
         // change button label
-        ui->startTimeBtn->setText("Start");
+        ui->startBreakBtn->setText("---");
 
         // Unset flag
-        m_timeStatus.isRunning = false;
+        m_breakStatus.isRunning = false;
+        m_breakStatus.isPaused = false;
+        m_breakStatus.isDone = true;
     }
 }
+
+void Pomodoro::on_resetTimeBtn_clicked()
+{
+    disconnect(m_timeCounterTimer, SIGNAL(timeout()), this, SLOT(updateClockTime()));
+
+    // set initial values
+    setLineEdit("-1", ui->setTimeLineEdit, ui->timeCounter);
+
+    // change button label
+    ui->startTimeBtn->setText("Start");
+
+    // Unset flag
+    m_timeStatus.isRunning = false;
+    m_timeStatus.isPaused = false;
+    m_timeStatus.isDone = false;
+}
+
+
+void Pomodoro::on_resetBreakBtn_clicked()
+{
+    disconnect(m_breakCounterTimer, SIGNAL(timeout()), this, SLOT(updateClockBreak()));
+
+    // set initial values
+    setLineEdit("-1", ui->setBreakLineEdit, ui->breakCounter);
+
+    // change button label
+    ui->startBreakBtn->setText("Start");
+
+    // Unset flag
+    m_breakStatus.isRunning = false;
+    m_breakStatus.isPaused = false;
+    m_breakStatus.isDone = false;
+}
+

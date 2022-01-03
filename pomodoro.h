@@ -26,6 +26,7 @@ class Pomodoro : public QMainWindow
     {
         bool isRunning;
         bool isPaused;
+        bool isDone;
     };
 
 public:
@@ -47,10 +48,10 @@ private:
     TimerStatus m_breakStatus;
 
 private slots:
-    void on_setTimeLineEdit_textEdited(const QString &minuteStr);
-    void on_setBreakLineEdit_textEdited(const QString &minuteStr);
-
-    void validateMinute(QString minuteStr, QLineEdit* lineEdit);
+    void on_setTimeLineEdit_editingFinished();
+    void on_setBreakLineEdit_editingFinished();
+    void setLineEdit(const QString &minuteStr, QLineEdit* lineEdit, QLabel* labelCounter);
+    void validateMinute(const QString minuteStr, QLineEdit* lineEdit);
 
     QString formatMinSec(QLineEdit* lineEditMin);
     QString formatMinSec(int minute, int second);
@@ -61,5 +62,7 @@ private slots:
     void toggleTimer(TimerStatus &timerStatus, TimeInfo &timeInfo, QLineEdit* lineEdit, QTimer*& timer, QPushButton* pushButton, QLabel* counterLabel);
     void updateClockTime();
     void updateClockBreak();
+    void on_resetTimeBtn_clicked();
+    void on_resetBreakBtn_clicked();
 };
 #endif // POMODORO_H
